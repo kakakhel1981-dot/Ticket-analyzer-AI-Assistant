@@ -1,0 +1,4 @@
+my-ticket-analyzer/
+│
+├── app.py              # Main Streamlit application
+└── requirements.txt    # Python dependencies
