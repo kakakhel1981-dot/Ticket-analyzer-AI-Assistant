@@ -16,14 +16,14 @@ st.title("📊 Ticket Data Analytics & Root-Cause AI")
 st.markdown("Upload your support ticket Excel file to analyze workcodes, discover high-frequency issue patterns, and generate permanent fix strategies.")
 
 # ---------------------------------------------------------
-# Sidebar Configuration & API Setup
+# Sidebar Configuration & Dynamic Model Fetching
 # ---------------------------------------------------------
 st.sidebar.header("🔑 Model & API Configuration")
 
 # Provider Selection
 provider = st.sidebar.selectbox(
     "Select LLM Provider",
-    ["Groq (Free API Tier Available)", "OpenAI"]
+    ["Groq (Free API Tier)", "OpenAI"]
 )
 
 api_key = ""
@@ -33,35 +33,45 @@ if "Groq" in provider:
     default_key = st.secrets.get("GROQ_API_KEY", os.environ.get("GROQ_API_KEY", ""))
     api_key = st.sidebar.text_input("Groq API Key", value=default_key, type="password", help="Get a free key at console.groq.com")
     
-    selected_model = st.sidebar.selectbox(
-        "Select Groq Model",
-        [
-            "llama-3.3-70b-versatile",
+    # Dynamic Model Fetching for Groq
+    groq_models = []
+    if api_key:
+        try:
+            temp_client = Groq(api_key=api_key)
+            models_page = temp_client.models.list()
+            # Filter chat-compatible text models
+            groq_models = [
+                m.id for m in models_page.data 
+                if not any(x in m.id for x in ["whisper", "orpheus", "guard", "embed", "vision"])
+            ]
+        except Exception:
+            pass
+
+    # Fallbacks in case fetching fails or key is missing
+    if not groq_models:
+        groq_models = [
             "llama-3.1-8b-instant",
-            "meta-llama/llama-4-scout-17b-16e-instruct",
-            "qwen/qwen3-32b"
-        ],
-        index=0
-    )
+            "openai/gpt-oss-20b",
+            "openai/gpt-oss-120b",
+            "qwen/qwen3.8-27b"
+        ]
+
+    selected_model = st.sidebar.selectbox("Select Groq Model", groq_models, index=0)
     provider_type = "Groq"
+
 else:
     default_key = st.secrets.get("OPENAI_API_KEY", os.environ.get("OPENAI_API_KEY", ""))
     api_key = st.sidebar.text_input("OpenAI API Key", value=default_key, type="password")
     
     selected_model = st.sidebar.selectbox(
         "Select OpenAI Model",
-        [
-            "gpt-4o-mini",
-            "gpt-4o",
-            "gpt-oss-120b",
-            "gpt-oss-20b"
-        ],
+        ["gpt-4o-mini", "gpt-4o"],
         index=0
     )
     provider_type = "OpenAI"
 
 st.sidebar.markdown("---")
-st.sidebar.info("💡 **Free Tier Note:** Groq provides a free API tier with high daily request limits. Create a free key at console.groq.com to run without costs.")
+st.sidebar.info("💡 **Tip:** Groq provides a free API tier. Make sure your API key is valid at `console.groq.com`.")
 
 # Helper function to query the chosen LLM
 def query_llm(prompt: str, system_message: str = "You are an expert L2 support analyst and process optimization engineer.") -> str:
